@@ -19,20 +19,23 @@ namespace Lab_2_webapi.Services
 {
     public interface IPermissionsService
     {
-       
-        object Delete(int id,int permissionid);
+
+        object Delete(int id, int permissionid);
         PermissionsGetModel GetPermission(int id);
         UserRole GetPermissionFromDb(String permissionName);
         object PermissionUpsert(int userId, PermissionPostModel permissionPostModel);
-        
-        }
+        IEnumerable<UserRole> GetAllUserRole();
+        UserRole DeleteUserRole(int id);
+        UserRole Upsert(UserRolePostModel userRole);
+
+    }
 
     public class PermissionsService : IPermissionsService
     {
         private TasksDbContext context;
         private readonly AppSettings appSettings;
         private IPermissionValidator permissionValidator;
-        public PermissionsService(TasksDbContext context, IOptions<AppSettings> appSettings,IPermissionValidator permissionValidator)
+        public PermissionsService(TasksDbContext context, IOptions<AppSettings> appSettings, IPermissionValidator permissionValidator)
         {
             this.context = context;
             this.appSettings = appSettings.Value;
@@ -40,8 +43,8 @@ namespace Lab_2_webapi.Services
 
         }
 
-     
-        public object Delete(int userId,int idPermission)
+
+        public object Delete(int userId, int idPermission)
         {
             var existing = context.Users.Include("UserUserRoles.UserRole").FirstOrDefault(u => u.Id == userId);
             var permission = context.UserUserRoles.FirstOrDefault(u => u.Id == idPermission);
@@ -83,12 +86,13 @@ namespace Lab_2_webapi.Services
                     //UserUserRoles = user.UserUserRoles.OrderBy(o=>o.StartTime).ToList()
                 };
                 return permissionGetModel;
-            } else { return null; }
-           
+            }
+            else { return null; }
+
         }
         public PermissionGetModel PermissionHelper(UserUserRole userModel)
         {
-          return new PermissionGetModel
+            return new PermissionGetModel
             {
                 Id = userModel.Id,
                 UserRole = userModel.UserRole.Name,
@@ -98,13 +102,13 @@ namespace Lab_2_webapi.Services
         }
         public UserRole GetPermissionFromDb(String permissionName)
         {
-           UserRole permission = context.UserRoles.FirstOrDefault(u => u.Name.Equals(permissionName));
+            UserRole permission = context.UserRoles.FirstOrDefault(u => u.Name.Equals(permissionName));
             if (permission == null) { return null; }
             else return permission;
         }
         public object PermissionUpsert(int userId, PermissionPostModel permissionPostModel)
         {
-            var errors = permissionValidator.Validate(permissionPostModel,context);
+            var errors = permissionValidator.Validate(permissionPostModel, context);
             if (errors != null)
             {
                 return errors;
@@ -112,9 +116,11 @@ namespace Lab_2_webapi.Services
             var existing = context.Users.Include("UserUserRoles.UserRole").FirstOrDefault(u => u.Id == userId);
             var permission = this.GetPermissionFromDb(permissionPostModel.UserRole);
             if (existing == null)
-            { return null;
-            }if (existing.UserUserRoles.Any(u => u.
-            UserRole.Equals(permission)))
+            {
+                return null;
+            }
+            if (existing.UserUserRoles.Any(u => u.
+           UserRole.Equals(permission)))
             {
                 UserUserRole currentUseRole = existing.UserUserRoles.FirstOrDefault(u => u.UserRole.Equals(permission));
                 currentUseRole.EndTime = permissionPostModel.EndTime;
@@ -131,9 +137,65 @@ namespace Lab_2_webapi.Services
                     EndTime = permissionPostModel.EndTime,
                 });
             }
-                
-                context.SaveChanges();
+
+            context.SaveChanges();
             return this.GetPermission(userId);
-            }
         }
+
+
+
+
+
+        public UserRole RoleCreate(UserRole userRole)
+        {
+            context.UserRoles.Add(userRole);
+            context.SaveChanges();
+            return userRole;
+        }
+
+        public UserRole DeleteUserRole(int id)
+        {
+            var existing = context.UserRoles
+                .FirstOrDefault(userRole => userRole.Id == id);
+            if (existing == null)
+            {
+                return null;
+            }
+            context.UserRoles.Remove(existing);
+            context.SaveChanges();
+            return existing;
+        }
+
+        public IEnumerable<UserRole> GetAllUserRole()
+        {
+            return context.UserRoles;
+        }
+
+       
+
+        public UserRole Upsert(UserRolePostModel userRole)
+        {
+
+            var existing = context.UserRoles.FirstOrDefault(f => f.Name == userRole.UserRole);
+            if (existing == null)
+            {
+                context.UserRoles.Add(new UserRole
+                {
+                    Description = userRole.Description,
+                    Name = userRole.UserRole
+
+                });
+                context.SaveChanges();
+            }
+            else
+
+            {
+                existing.Name = userRole.UserRole;
+                existing.Description = userRole.Description;
+                context.UserRoles.Update(existing);
+            }
+            context.SaveChanges();
+            return existing = context.UserRoles.FirstOrDefault(f => f.Name == userRole.UserRole);
+        }
+    }
 }
